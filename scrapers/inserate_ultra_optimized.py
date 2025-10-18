@@ -111,7 +111,7 @@ class UltraOptimizedScraper:
             if not data_adid or not data_href:
                 return None
 
-            # Parallel extraction of text content
+            # Parallel extraction of text content and image
             title_task = self._get_text_content(
                 article, "h2.text-module-begin a.ellipsis"
             )
@@ -121,9 +121,10 @@ class UltraOptimizedScraper:
             desc_task = self._get_text_content(
                 article, "p.aditem-main--middle--description"
             )
+            image_task = self._get_image_url(article)
 
-            title_text, price_text, description_text = await asyncio.gather(
-                title_task, price_task, desc_task, return_exceptions=True
+            title_text, price_text, description_text, image_url = await asyncio.gather(
+                title_task, price_task, desc_task, image_task, return_exceptions=True
             )
 
             # Process price text efficiently
@@ -145,6 +146,7 @@ class UltraOptimizedScraper:
                 "description": description_text
                 if isinstance(description_text, str)
                 else "",
+                "image": image_url if isinstance(image_url, str) else None,
             }
 
         except Exception:
@@ -159,6 +161,26 @@ class UltraOptimizedScraper:
             return ""
         except Exception:
             return ""
+
+    async def _get_image_url(self, article) -> str:
+        """Extract image URL from article element."""
+        try:
+            # Try to find the image element
+            image_element = await article.query_selector(
+                "div.aditem-main--top--left img.imagebox-thumbnail"
+            )
+            if image_element:
+                # Try src first
+                image_url = await image_element.get_attribute("src")
+                # If src is placeholder or missing, try data-src (lazy loading)
+                if not image_url or "placeholder" in image_url:
+                    data_src = await image_element.get_attribute("data-src")
+                    if data_src:
+                        image_url = data_src
+                return image_url if image_url else None
+            return None
+        except Exception:
+            return None
 
     @monitor_slow_coroutines(threshold=2.0)
     async def ultra_optimized_fetch_page(

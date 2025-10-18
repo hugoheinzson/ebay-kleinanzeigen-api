@@ -49,6 +49,18 @@ async def get_ads(page):
                     "p.aditem-main--middle--description"
                 )
                 description_text = await description.inner_text() if description else ""
+                
+                # Get image URL
+                image_url = None
+                image_element = await article.query_selector(
+                    "div.aditem-main--top--left img.imagebox-thumbnail"
+                )
+                if image_element:
+                    image_url = await image_element.get_attribute("src")
+                    # If src is lazy-loaded, try data-src
+                    if not image_url or image_url.endswith("placeholder.svg"):
+                        image_url = await image_element.get_attribute("data-src")
+                
                 if data_adid and data_href:
                     data_href = f"https://www.kleinanzeigen.de{data_href}"
                     results.append(
@@ -58,6 +70,7 @@ async def get_ads(page):
                             "title": title_text,
                             "price": price_text,
                             "description": description_text,
+                            "image": image_url,
                         }
                     )
         return results
