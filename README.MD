@@ -48,12 +48,14 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
-3. Start the API
+3. Start the services
 ```sh
-uvicorn main:app --reload
+python serve.py
 ```
 
-The API will be available at `http://localhost:8000`
+This command starts both servers:
+- REST API on `http://localhost:8000`
+- MCP server on `http://localhost:8001/mcp`
 
 ### API Endpoints
 
@@ -103,6 +105,17 @@ All API endpoints return responses in the following JSON format:
 ```
 
 API documentation is available at `http://localhost:8000/docs` when running locally.
+
+### Model Context Protocol
+
+The MCP server mirrors the REST API as tools that can be invoked by MCP-compatible clients. Configure your client to connect to `http://localhost:8001/mcp` (or the container port you expose) and authenticate if required by your setup. The following environment variables are available:
+
+- `MCP_HOST` (default `0.0.0.0`)
+- `MCP_PORT` (default `8001`)
+- `API_HOST` (default `0.0.0.0`)
+- `API_PORT` (default `8000`)
+
+When running via Docker, both services are started automatically.
 
 ## License
 Distributed under the MIT License. See `LICENSE` for more information.
