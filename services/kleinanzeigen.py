@@ -1,11 +1,12 @@
 from typing import Optional
 
-from scrapers.inserate import get_inserate_klaz
-from scrapers.inserat import get_inserate_details
-from utils.browser import PlaywrightManager
+from scrapers.inserate import get_inserate_klaz_optimized
+from scrapers.inserat import get_inserate_details_optimized
+from utils.browser import OptimizedPlaywrightManager
 
 
 async def fetch_listings(
+    browser_manager: OptimizedPlaywrightManager,
     query: Optional[str] = None,
     location: Optional[str] = None,
     radius: Optional[int] = None,
@@ -13,29 +14,27 @@ async def fetch_listings(
     max_price: Optional[int] = None,
     page_count: int = 1,
 ):
-    browser_manager = PlaywrightManager()
-    await browser_manager.start()
-    try:
-        results = await get_inserate_klaz(
-            browser_manager,
-            query,
-            location,
-            radius,
-            min_price,
-            max_price,
-            page_count,
-        )
-        return results
-    finally:
-        await browser_manager.close()
+    """Fetch listings using the optimized scraper with shared browser manager."""
+    response = await get_inserate_klaz_optimized(
+        browser_manager,
+        query,
+        location,
+        radius,
+        min_price,
+        max_price,
+        page_count,
+    )
+    return response
 
 
-async def fetch_listing_details(listing_id: str):
-    browser_manager = PlaywrightManager()
-    await browser_manager.start()
+async def fetch_listing_details(
+    browser_manager: OptimizedPlaywrightManager,
+    listing_id: str
+):
+    """Fetch listing details using the optimized scraper with shared browser manager."""
+    url = f"https://www.kleinanzeigen.de/s-anzeige/{listing_id}"
+    page = await browser_manager.new_context_page()
     try:
-        page = await browser_manager.new_context_page()
-        url = f"https://www.kleinanzeigen.de/s-anzeige/{listing_id}"
-        return await get_inserate_details(url, page)
+        return await get_inserate_details_optimized(url, page)
     finally:
-        await browser_manager.close()
+        await browser_manager.close_page(page)
