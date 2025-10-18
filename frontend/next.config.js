@@ -9,7 +9,13 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000'
+    // Mehrere mögliche Variablennamen unterstützen.
+    // Wichtig: Diese werden zur Build-Zeit aufgelöst – deshalb BACKEND_URL auch als build arg setzen.
+    const backendUrl =
+      process.env.BACKEND_URL ||
+      process.env.API_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_BASE_URL ||
+      'http://backend:8000'
     const normalizedBackendUrl = backendUrl.endsWith('/')
       ? backendUrl.slice(0, -1)
       : backendUrl

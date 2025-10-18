@@ -70,3 +70,4 @@ coverage.xml
 .pytest_cache/
 .ruff_cache/
 .venv
+ebay-kleinanzeigen-api.code-workspace
