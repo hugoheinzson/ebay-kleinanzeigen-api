@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  backend:
+    container_name: kleinanzeigen-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      UVICORN_LOG_LEVEL: info
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8001
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    shm_size: "1gb"
+    restart: unless-stopped
+
+  frontend:
+    container_name: kleinanzeigen-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: http://kleinanzeigen-api:8000
+      PORT: 3000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    restart: unless-stopped
