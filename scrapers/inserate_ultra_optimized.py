@@ -10,7 +10,7 @@ import time
 import random
 import gc
 from urllib.parse import urlencode
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 from fastapi import HTTPException
 
@@ -30,6 +30,7 @@ from utils.asyncio_optimizations import (
     EventLoopOptimizer,
     monitor_slow_coroutines,
 )
+from scrapers.inserate import extract_listing_image_url
 
 
 class UltraOptimizedScraper:
@@ -162,23 +163,10 @@ class UltraOptimizedScraper:
         except Exception:
             return ""
 
-    async def _get_image_url(self, article) -> str:
+    async def _get_image_url(self, article) -> Optional[str]:
         """Extract image URL from article element."""
         try:
-            # Try to find the image element
-            image_element = await article.query_selector(
-                "div.aditem-main--top--left img.imagebox-thumbnail"
-            )
-            if image_element:
-                # Try src first
-                image_url = await image_element.get_attribute("src")
-                # If src is placeholder or missing, try data-src (lazy loading)
-                if not image_url or "placeholder" in image_url:
-                    data_src = await image_element.get_attribute("data-src")
-                    if data_src:
-                        image_url = data_src
-                return image_url if image_url else None
-            return None
+            return await extract_listing_image_url(article)
         except Exception:
             return None
 

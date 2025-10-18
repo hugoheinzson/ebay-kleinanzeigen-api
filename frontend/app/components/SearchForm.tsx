@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { SearchParams } from '../types'
-import { Search, MapPin, Euro, SlidersHorizontal } from 'lucide-react'
+import { Search, MapPin, Euro, SlidersHorizontal, User, Truck } from 'lucide-react'
 
 interface SearchFormProps {
   onSearch: (params: SearchParams) => void
@@ -18,6 +18,9 @@ export default function SearchForm({ onSearch, loading }: SearchFormProps) {
   const [priceMax, setPriceMax] = useState<number | undefined>()
   const [sortBy, setSortBy] = useState('RELEVANCE')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [sellerType, setSellerType] = useState<'private' | 'business' | undefined>()
+  const [sellerBadges, setSellerBadges] = useState<string[]>([])
+  const [shippingOption, setShippingOption] = useState<'all' | 'shipping' | 'pickup'>('all')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,6 +33,9 @@ export default function SearchForm({ onSearch, loading }: SearchFormProps) {
       priceMin,
       priceMax,
       sortBy,
+      sellerType,
+      sellerBadges,
+      shippingOption,
     }
 
     onSearch(params)
@@ -49,6 +55,26 @@ export default function SearchForm({ onSearch, loading }: SearchFormProps) {
     { value: '5', label: 'Musik, Filme & Bücher' },
     { value: '234', label: 'Unterricht & Kurse' },
   ]
+
+  const sellerBadgeOptions = [
+    { value: 'Sehr freundlich', label: 'Sehr freundlich' },
+    { value: 'Sehr zuverlässig', label: 'Sehr zuverlässig' },
+    { value: 'TOP Zufriedenheit', label: 'TOP Zufriedenheit' },
+    { value: 'Schnelle Antwort', label: 'Schnelle Antwort' },
+    { value: 'Profi Verkäufer', label: 'Profi Verkäufer' },
+  ]
+
+  const shippingOptions = [
+    { value: 'all', label: 'Alle' },
+    { value: 'shipping', label: 'Nur Versand' },
+    { value: 'pickup', label: 'Nur Selbstabholung' },
+  ]
+
+  const toggleBadge = (badge: string) => {
+    setSellerBadges((prev) =>
+      prev.includes(badge) ? prev.filter((item) => item !== badge) : [...prev, badge]
+    )
+  }
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
@@ -175,6 +201,79 @@ export default function SearchForm({ onSearch, loading }: SearchFormProps) {
                 <option value="DATE_DESC">Neueste zuerst</option>
                 <option value="DATE_ASC">Älteste zuerst</option>
               </select>
+            </div>
+
+            {/* Shipping Options */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Truck className="h-4 w-4 inline mr-1" />
+                Versand
+              </label>
+              <select
+                value={shippingOption}
+                onChange={(e) => setShippingOption(e.target.value as typeof shippingOption)}
+                className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {shippingOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Seller Filters */}
+            <div className="md:col-span-2 border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <div className="flex items-center text-sm font-semibold text-gray-700 mb-3">
+                <User className="h-4 w-4 mr-2 text-blue-600" />
+                Verkäufer
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Verkäufer Badges
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {sellerBadgeOptions.map((badge) => {
+                      const isActive = sellerBadges.includes(badge.value)
+                      return (
+                        <button
+                          key={badge.value}
+                          type="button"
+                          onClick={() => toggleBadge(badge.value)}
+                          aria-pressed={isActive}
+                          className={`px-3 py-1 rounded-full border text-xs font-medium transition-colors ${
+                            isActive
+                              ? 'bg-blue-100 text-blue-700 border-blue-300'
+                              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          {badge.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-wide text-gray-500 mb-2">
+                    Verkäufer Typ
+                  </label>
+                  <select
+                    value={sellerType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setSellerType(value ? (value as typeof sellerType) : undefined)
+                    }}
+                    className="block w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Alle</option>
+                    <option value="private">Privater Nutzer</option>
+                    <option value="business">Gewerblicher Nutzer</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         )}

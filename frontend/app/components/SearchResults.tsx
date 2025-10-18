@@ -1,8 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { SearchResult } from '../types'
-import { MapPin, Euro, ExternalLink, Clock, Grid3x3, List } from 'lucide-react'
+import { SearchResult, SellerInfo, ShippingInfo } from '../types'
+import {
+  MapPin,
+  Euro,
+  ExternalLink,
+  Clock,
+  Grid3x3,
+  List,
+  Truck,
+  BadgeCheck,
+  UserCircle2,
+} from 'lucide-react'
 
 interface SearchResultsProps {
   results: SearchResult[]
@@ -93,20 +103,25 @@ export default function SearchResults({ results }: SearchResultsProps) {
                 </div>
               )}
 
-              {/* Date */}
-              {result.created_at && (
-                <div className="flex items-center text-sm text-gray-500 mb-3">
-                  <Clock className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span>{formatDate(result.created_at)}</span>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mb-3">
+                {result.created_at && (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDate(result.created_at)}
+                  </span>
+                )}
+                <ShippingBadge shipping={result.shipping} />
+              </div>
+
+              <SellerSummary seller={result.seller} className="mb-3" />
 
               {/* Description */}
-              {result.description && (
-                <p className="text-sm text-gray-600 line-clamp-2 mb-4">
-                  {result.description}
-                </p>
-              )}
+              <DescriptionTooltip
+                description={result.description}
+                previewClassName="line-clamp-2"
+                maxPreviewChars={120}
+                containerClassName="mb-4"
+              />
 
               {/* View Button */}
               <a
@@ -181,12 +196,16 @@ export default function SearchResults({ results }: SearchResultsProps) {
                           {result.location}
                         </div>
                       )}
-                      {result.created_at && (
-                        <div className="flex items-center text-xs text-gray-400 mt-1">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {formatDate(result.created_at)}
-                        </div>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mt-2">
+                        {result.created_at && (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {formatDate(result.created_at)}
+                          </span>
+                        )}
+                        <ShippingBadge shipping={result.shipping} />
+                      </div>
+                      <SellerSummary seller={result.seller} className="mt-2" />
                     </td>
 
                     {/* Price */}
@@ -199,21 +218,11 @@ export default function SearchResults({ results }: SearchResultsProps) {
 
                     {/* Description */}
                     <td className="px-6 py-4">
-                      <div className="relative group">
-                        <div className="text-sm text-gray-600 max-w-2xl line-clamp-4 cursor-help">
-                          {result.description || 'Keine Beschreibung'}
-                        </div>
-                        
-                        {/* Tooltip with full description on hover */}
-                        {result.description && result.description.length > 150 && (
-                          <div className="invisible group-hover:visible absolute z-50 w-96 p-4 mt-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-lg shadow-xl left-0 top-full">
-                            <div className="font-semibold text-gray-900 mb-2">Vollständige Beschreibung:</div>
-                            <div className="max-h-64 overflow-y-auto whitespace-pre-wrap">
-                              {result.description}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <DescriptionTooltip
+                        description={result.description}
+                        previewClassName="max-w-2xl line-clamp-4"
+                        maxPreviewChars={180}
+                      />
                     </td>
 
                     {/* Action */}
@@ -257,4 +266,139 @@ function formatDate(dateString: string): string {
   } catch {
     return dateString
   }
+}
+
+interface DescriptionTooltipProps {
+  description?: string
+  previewClassName?: string
+  containerClassName?: string
+  maxPreviewChars?: number
+}
+
+function DescriptionTooltip({
+  description,
+  previewClassName = '',
+  containerClassName = '',
+  maxPreviewChars = 160,
+}: DescriptionTooltipProps) {
+  if (!description) {
+    return (
+      <div className={`text-sm text-gray-400 ${containerClassName}`}>
+        Keine Beschreibung
+      </div>
+    )
+  }
+
+  const normalized = description.trim()
+  const showTooltip = normalized.length > maxPreviewChars || normalized.includes('\n')
+
+  return (
+    <div className={`relative group ${containerClassName}`}>
+      <div
+        className={`text-sm text-gray-600 cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${previewClassName}`}
+        tabIndex={showTooltip ? 0 : -1}
+        title={!showTooltip ? normalized : undefined}
+        aria-label={showTooltip ? 'Vollständige Beschreibung anzeigen' : undefined}
+      >
+        {normalized}
+      </div>
+
+      {showTooltip && (
+        <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 absolute z-50 left-0 top-full mt-2 w-96 text-sm">
+          <div className="pointer-events-none bg-white border border-gray-200 rounded-lg shadow-xl p-4">
+            <div className="font-semibold text-gray-900 mb-2">Vollständige Beschreibung</div>
+            <div className="max-h-64 overflow-y-auto text-gray-700 whitespace-pre-wrap pointer-events-auto">
+              {normalized}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface SellerSummaryProps {
+  seller?: SellerInfo
+  className?: string
+}
+
+function SellerSummary({ seller, className = '' }: SellerSummaryProps) {
+  if (!seller) return null
+
+  const hasName = Boolean(seller.name)
+  const hasBadges = Array.isArray(seller.badges) && seller.badges.length > 0
+
+  if (!hasName && !hasBadges) {
+    return null
+  }
+
+  const sellerTypeLabel =
+    seller.type === 'business'
+      ? 'Gewerblicher Anbieter'
+      : seller.type === 'private'
+        ? 'Privater Anbieter'
+        : undefined
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {hasName && (
+        <div className="flex items-center text-xs font-medium text-gray-600 gap-2">
+          <UserCircle2 className="h-4 w-4 text-blue-500" />
+          <span>{seller.name}</span>
+          {sellerTypeLabel && (
+            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+              {sellerTypeLabel}
+            </span>
+          )}
+        </div>
+      )}
+
+      {seller.since && (
+        <div className="text-[11px] text-gray-400 pl-6">
+          Aktiv seit {seller.since}
+        </div>
+      )}
+
+      {hasBadges && (
+        <div className="flex flex-wrap gap-2">
+          {seller.badges.slice(0, 4).map((badge) => (
+            <span
+              key={badge}
+              className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700"
+            >
+              <BadgeCheck className="h-3 w-3" />
+              {badge}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ShippingBadgeProps {
+  shipping?: ShippingInfo
+}
+
+function ShippingBadge({ shipping }: ShippingBadgeProps) {
+  if (!shipping || shipping.code === 'unknown') {
+    return null
+  }
+
+  const tone =
+    shipping.code === 'shipping'
+      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      : shipping.code === 'pickup'
+        ? 'bg-amber-50 text-amber-700 border-amber-200'
+        : 'bg-blue-50 text-blue-700 border-blue-200'
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tone}`}
+      title={shipping.description || shipping.raw || undefined}
+    >
+      <Truck className="h-3 w-3" />
+      {shipping.label}
+    </span>
+  )
 }

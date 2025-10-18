@@ -1,7 +1,11 @@
 import asyncio
+import json
 import time
 import random
 from urllib.parse import urlencode
+
+from typing import Optional
+from playwright.async_api import ElementHandle
 
 from fastapi import HTTPException
 
@@ -15,6 +19,80 @@ from utils.error_handling import (
     ErrorSeverity,
     error_handling_context,
 )
+
+
+IMAGE_SELECTORS = [
+    "div.aditem-image img",
+    "div.imagebox img",
+    "div.aditem-main--top--left img.imagebox-thumbnail",
+]
+PLACEHOLDER_TOKENS = ("placeholder", "data:image")
+
+
+def _normalize_image_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return None
+    normalized = url.strip()
+    if not normalized:
+        return None
+    if normalized.startswith("//"):
+        normalized = f"https:{normalized}"
+    return normalized
+
+
+async def extract_listing_image_url(article: ElementHandle) -> Optional[str]:
+    """
+    Try multiple selectors and attribute combinations to extract a usable image URL.
+    Falls back to structured data if the <img> tag cannot be accessed.
+    """
+    image_element: Optional[ElementHandle] = None
+
+    for selector in IMAGE_SELECTORS:
+        image_element = await article.query_selector(selector)
+        if image_element:
+            break
+
+    image_url: Optional[str] = None
+    if image_element:
+        for attribute in ("src", "data-src", "data-imgsrc", "data-img-src"):
+            candidate = await image_element.get_attribute(attribute)
+            candidate = _normalize_image_url(candidate)
+            if candidate and not any(
+                token in candidate for token in PLACEHOLDER_TOKENS
+            ):
+                image_url = candidate
+                break
+
+        if not image_url:
+            srcset = await image_element.get_attribute("srcset")
+            if srcset:
+                first_src = srcset.split(",")[0].strip().split(" ")[0]
+                first_src = _normalize_image_url(first_src)
+                if first_src and not any(
+                    token in first_src for token in PLACEHOLDER_TOKENS
+                ):
+                    image_url = first_src
+
+    if not image_url:
+        ld_json_element = await article.query_selector(
+            "script[type='application/ld+json']"
+        )
+        if ld_json_element:
+            try:
+                raw_json = await ld_json_element.inner_text()
+                if raw_json:
+                    data = json.loads(raw_json)
+                    candidate = data.get("contentUrl") or data.get("contentURL")
+                    if isinstance(candidate, list):
+                        candidate = candidate[0] if candidate else None
+                    image_url = _normalize_image_url(candidate)
+            except Exception:
+                # Ignore malformed JSON and continue without an image
+                image_url = None
+
+    if image_url and not any(token in image_url for token in PLACEHOLDER_TOKENS):
+        return image_url
+    return None
 
 
 async def get_ads(page):
@@ -50,17 +128,8 @@ async def get_ads(page):
                 )
                 description_text = await description.inner_text() if description else ""
                 
-                # Get image URL
-                image_url = None
-                image_element = await article.query_selector(
-                    "div.aditem-main--top--left img.imagebox-thumbnail"
-                )
-                if image_element:
-                    image_url = await image_element.get_attribute("src")
-                    # If src is lazy-loaded, try data-src
-                    if not image_url or image_url.endswith("placeholder.svg"):
-                        image_url = await image_element.get_attribute("data-src")
-                
+                image_url = await extract_listing_image_url(article)
+
                 if data_adid and data_href:
                     data_href = f"https://www.kleinanzeigen.de{data_href}"
                     results.append(

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import SearchForm from './components/SearchForm'
 import SearchResults from './components/SearchResults'
-import { SearchParams, SearchResult } from './types'
+import { SearchParams, SearchResult, SellerInfo, ShippingInfo } from './types'
 
 export default function Home() {
   const [results, setResults] = useState<SearchResult[]>([])
@@ -23,9 +23,21 @@ export default function Home() {
       if (params.radius) queryParams.append('radius', params.radius.toString())
       if (params.priceMin) queryParams.append('min_price', params.priceMin.toString())
       if (params.priceMax) queryParams.append('max_price', params.priceMax.toString())
+      if (params.category) queryParams.append('category', params.category)
+      if (params.sortBy) queryParams.append('sort', params.sortBy)
+      if (params.sellerType) queryParams.append('seller_type', params.sellerType)
+      if (params.shippingOption && params.shippingOption !== 'all') {
+        queryParams.append('shipping', params.shippingOption)
+      }
+      if (params.sellerBadges && params.sellerBadges.length > 0) {
+        params.sellerBadges.forEach((badge) =>
+          queryParams.append('seller_badge', badge)
+        )
+      }
 
       console.log('Fetching:', `/api/backend/inserate?${queryParams.toString()}`)
-      const response = await fetch(`/api/backend/inserate?${queryParams.toString()}`)
+      // Use detailed endpoint to enrich results with seller badges and shipping options
+      const response = await fetch(`/api/backend/inserate-detailed?${queryParams.toString()}`)
       
       if (!response.ok) {
         const errorText = await response.text()
@@ -36,8 +48,8 @@ export default function Home() {
       const data = await response.json()
       console.log('API Response:', data)
       
-      // API returns "results" not "data"
-      const resultsArray = data.results || data.data || []
+      // Combined endpoint returns detailed data under "data"
+      const resultsArray = data.data || data.results || []
       console.log('Results array:', resultsArray, 'length:', resultsArray.length)
       
       // Map backend data structure to frontend format
@@ -47,16 +59,65 @@ export default function Home() {
         return
       }
 
-      const mappedResults = resultsArray.map((item: any) => ({
-        id: item.adid || `${Date.now()}-${Math.random()}`,
-        title: item.title || 'Kein Titel',
-        price: item.price || 'Preis auf Anfrage',
-        location: item.location || '',
-        image: item.image,
-        url: item.url || '#',
-        description: item.description || '',
-        created_at: item.created_at
-      }))
+      const mappedResults = resultsArray.map((item: any) => {
+        const details = item.details || {}
+        const sellerBadges = Array.isArray(details.seller?.badges)
+          ? details.seller.badges.filter((badge: unknown): badge is string => typeof badge === 'string' && badge.trim().length > 0)
+          : []
+        const sellerName = typeof details.seller?.name === 'string' ? details.seller.name.trim() : undefined
+        const sellerSince = typeof details.seller?.since === 'string' ? details.seller.since.trim() : undefined
+        const sellerType = details.seller?.type
+        const hasSellerInfo =
+          Boolean(sellerName) || Boolean(sellerSince) || sellerBadges.length > 0 || Boolean(sellerType)
+        const seller: SellerInfo | undefined = hasSellerInfo
+          ? {
+              name: sellerName,
+              since: sellerSince,
+              type: sellerType,
+              badges: sellerBadges,
+            }
+          : undefined
+
+        const locationData = details.location || {}
+        const primaryLocation = [locationData.zip, locationData.city]
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+        const locationParts = [
+          primaryLocation || null,
+          locationData.state || null,
+        ].filter(Boolean)
+        const locationFormatted = locationParts.length > 0 ? locationParts.join(', ') : ''
+
+        const shippingDetail =
+          details.details?.Versand ??
+          details.details?.['Versandart'] ??
+          details.details?.['Lieferung'] ??
+          null
+
+        const shipping: ShippingInfo = deriveShippingInfo(
+          details.delivery,
+          shippingDetail
+        )
+
+        const createdAt =
+          details.extra_info?.created_at ||
+          item.created_at ||
+          null
+
+        return {
+          id: item.adid || `${Date.now()}-${Math.random()}`,
+          title: item.title || 'Kein Titel',
+          price: item.price || 'Preis auf Anfrage',
+          location: locationFormatted || item.location || '',
+          image: item.image,
+          url: item.url || '#',
+          description: item.description || '',
+          created_at: createdAt || undefined,
+          seller,
+          shipping,
+        }
+      })
       
       console.log('Mapped results:', mappedResults.length, 'items')
       setResults(mappedResults)
@@ -146,4 +207,53 @@ export default function Home() {
       </footer>
     </div>
   )
+}
+
+function deriveShippingInfo(
+  deliveryCode?: string | null,
+  rawText?: string | null
+): ShippingInfo {
+  const normalizedRaw = rawText?.toLowerCase() ?? ''
+  const normalizedDelivery = deliveryCode?.toLowerCase() ?? ''
+  let code: ShippingInfo['code'] = 'unknown'
+  let label = 'Keine Versandangabe'
+  let description: string | undefined
+
+  if (normalizedRaw) {
+    description = rawText ?? undefined
+  }
+
+  const combined = `${normalizedDelivery} ${normalizedRaw}`.trim()
+
+  if (combined.includes('versand') && combined.includes('abholung')) {
+    code = 'both'
+    label = 'Versand & Abholung'
+  } else if (
+    combined.includes('nur versand') ||
+    combined.includes('nur-versand') ||
+    combined.includes('only shipping')
+  ) {
+    code = 'shipping'
+    label = 'Nur Versand'
+  } else if (
+    combined.includes('nur abholung') ||
+    combined.includes('selbstabholung') ||
+    combined.includes('pickup')
+  ) {
+    code = 'pickup'
+    label = 'Nur Abholung'
+  } else if (combined.includes('versand') || normalizedDelivery === 'shipping') {
+    code = 'shipping'
+    label = 'Versand möglich'
+  } else if (normalizedDelivery === 'pickup') {
+    code = 'pickup'
+    label = 'Abholung vor Ort'
+  }
+
+  return {
+    raw: rawText ?? deliveryCode ?? null,
+    code,
+    label,
+    description,
+  }
 }
