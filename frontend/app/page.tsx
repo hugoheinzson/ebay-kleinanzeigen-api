@@ -108,6 +108,13 @@ export default function Home() {
           item.created_at ||
           null
 
+        const distanceKm =
+          typeof item.distance_km === 'number'
+            ? item.distance_km
+            : typeof details.distance_km === 'number'
+              ? details.distance_km
+              : undefined
+
         return {
           id: item.adid || `${Date.now()}-${Math.random()}`,
           title: item.title || 'Kein Titel',
@@ -119,6 +126,7 @@ export default function Home() {
           created_at: createdAt || undefined,
           seller,
           shipping,
+          distance_km: distanceKm,
         }
       })
       

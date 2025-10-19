@@ -23,6 +23,7 @@ from utils.error_handling import (
     ErrorSeverity,
     error_handling_context,
 )
+from utils.location_filter import filter_listings_by_radius
 
 router = APIRouter()
 
@@ -666,12 +667,44 @@ async def get_inserate_with_details(
             )
 
             (
-                detailed_listings,
+                raw_detailed_listings,
                 detail_metrics,
                 detail_warnings,
             ) = await fetch_listing_details_concurrent(
                 browser_manager, listings, optimal_concurrency
             )
+
+            location_filter_stats = None
+            final_listings = raw_detailed_listings
+            if location and radius is not None:
+                final_listings, location_filter_stats = filter_listings_by_radius(
+                    raw_detailed_listings,
+                    location,
+                    float(radius) if radius is not None else None,
+                )
+
+                if (
+                    location_filter_stats.origin_coordinates is None
+                    and radius is not None
+                ):
+                    error_ctx.add_warning(
+                        f'Standort "{location}" konnte nicht für Distanzfilter aufgelöst werden',
+                        ErrorSeverity.MEDIUM,
+                        impact_description="Ergebnisse können Inserate außerhalb des gewünschten Radius enthalten",
+                    )
+                else:
+                    if location_filter_stats.excluded_count > 0:
+                        error_ctx.add_warning(
+                            f"{location_filter_stats.excluded_count} Inserate außerhalb des Radius von {radius} km wurden entfernt",
+                            ErrorSeverity.LOW,
+                            impact_description="Nur Inserate innerhalb der gewünschten Entfernung werden angezeigt",
+                        )
+                    if location_filter_stats.missing_count > 0:
+                        error_ctx.add_warning(
+                            f"{location_filter_stats.missing_count} Inserate ohne auswertbare Standortdaten wurden übersprungen",
+                            ErrorSeverity.LOW,
+                            impact_description="Einige Inserate konnten nicht nach Entfernung bewertet werden",
+                        )
 
             # Combine all metrics
             # Add listing search metrics
@@ -713,9 +746,12 @@ async def get_inserate_with_details(
                 all_warnings.extend(listings_response["warnings"])
             if detail_warnings:
                 all_warnings.extend(detail_warnings)
+            context_warnings = error_ctx.warnings.get_user_friendly_messages()
+            if context_warnings:
+                all_warnings.extend(context_warnings)
 
             # Calculate detail success metrics
-            detail_success_count = len(detailed_listings)
+            detail_success_count = len(raw_detailed_listings)
             detail_total_count = len(listings)
             detail_success_rate = (
                 (detail_success_count / detail_total_count * 100)
@@ -734,8 +770,8 @@ async def get_inserate_with_details(
             # Prepare comprehensive response
             response = {
                 "success": True,
-                "data": detailed_listings,
-                "unique_results": len(detailed_listings),
+                "data": final_listings,
+                "unique_results": len(final_listings),
                 "time_taken": round(final_metrics.total_time, 3),
                 "performance_metrics": {
                     **final_metrics.to_dict(),
@@ -769,6 +805,23 @@ async def get_inserate_with_details(
                 },
                 "browser_metrics": browser_manager.get_performance_metrics(),
             }
+
+            if location_filter_stats:
+                origin_coords = (
+                    list(location_filter_stats.origin_coordinates)
+                    if location_filter_stats.origin_coordinates
+                    else None
+                )
+                response["location_filter"] = {
+                    "query": location,
+                    "radius_km": location_filter_stats.radius_km,
+                    "origin_coordinates": origin_coords,
+                    "kept": location_filter_stats.kept_count,
+                    "excluded": location_filter_stats.excluded_count,
+                    "missing": location_filter_stats.missing_count,
+                    "excluded_ids": location_filter_stats.excluded_ids,
+                    "missing_ids": location_filter_stats.missing_ids,
+                }
 
             # Add warnings if any exist
             if all_warnings:

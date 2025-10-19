@@ -1,4 +1,6 @@
 import os
+from datetime import datetime, timezone
+
 import pytest
 
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
@@ -41,10 +43,12 @@ async def test_upsert_and_retrieve_listing(session):
         "seller": {"name": "Anna", "badges": ["Top"]},
         "price": {"amount": "450", "currency": "EUR", "negotiable": True},
         "images": ["https://example.com/image.jpg", "https://example.com/image2.jpg"],
-        "extra_info": {"created_at": "Heute"},
+        "extra_info": {"created_at": "15.01.2024, 13:45"},
     }
 
-    await repo.upsert_listing(summary, details, "woom-3", {"query": "Woom 3"})
+    result = await repo.upsert_listing(summary, details, "woom-3", {"query": "Woom 3"})
+    assert result.was_created is True
+    assert result.images_changed is True
     await session.commit()
 
     listings, total = await repo.list_listings(limit=10, offset=0)
@@ -54,6 +58,10 @@ async def test_upsert_and_retrieve_listing(session):
         "https://example.com/image.jpg",
         "https://example.com/image2.jpg",
     ]
+    assert listings[0].is_suspicious is False
+    assert listings[0].suspicion_reason is None
+    assert listings[0].posted_at == datetime(2024, 1, 15, 12, 45, tzinfo=timezone.utc)
+    assert listings[0].posted_at_text == "15.01.2024, 13:45"
 
     filtered, filtered_total = await repo.list_listings(
         limit=10, offset=0, query_name="woom-3", search_term="Kinderfahrrad"

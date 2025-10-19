@@ -36,6 +36,7 @@ export interface SearchResult {
   created_at?: string
   seller?: SellerInfo
   shipping?: ShippingInfo
+  distance_km?: number
 }
 
 export interface StoredListing {
@@ -65,8 +66,15 @@ export interface StoredListing {
   search_params?: Record<string, unknown> | null
   first_seen_at: string
   last_seen_at: string
+  posted_at?: string | null
+  posted_at_text?: string | null
   created_at: string
   updated_at: string
+  is_suspicious: boolean
+  suspicion_reason?: string | null
+  suspicion_confidence?: number | null
+  suspicion_meta?: Record<string, unknown> | null
+  last_analyzed_at?: string | null
 }
 
 export interface SchedulerJob {

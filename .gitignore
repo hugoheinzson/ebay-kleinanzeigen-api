@@ -71,3 +71,6 @@ coverage.xml
 .ruff_cache/
 .venv
 ebay-kleinanzeigen-api.code-workspace
+
+# Database data is stored in user directory (~/kleinanzeigen-database)
+# No need to ignore here since it's outside the project

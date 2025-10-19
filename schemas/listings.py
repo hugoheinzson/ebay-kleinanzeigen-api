@@ -44,8 +44,15 @@ class ListingResponse(BaseModel):
     search_params: Optional[Dict[str, Any]] = None
     first_seen_at: datetime
     last_seen_at: datetime
+    posted_at: Optional[datetime] = None
+    posted_at_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    is_suspicious: bool = False
+    suspicion_reason: Optional[str] = None
+    suspicion_confidence: Optional[float] = None
+    suspicion_meta: Optional[Dict[str, Any]] = None
+    last_analyzed_at: Optional[datetime] = None
 
     model_config = {
         "from_attributes": True,

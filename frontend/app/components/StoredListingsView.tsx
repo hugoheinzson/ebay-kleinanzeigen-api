@@ -10,9 +10,11 @@ import {
   MapPin,
   RefreshCcw,
   Tag,
+  ShieldAlert,
+  ShieldCheck,
 } from 'lucide-react'
 
-import type { StoredListing } from '../types'
+import type { SellerInfo, StoredListing } from '../types'
 
 interface Filters {
   queryName: string
@@ -73,6 +75,17 @@ export default function StoredListingsView() {
         ? data.items.map((item: StoredListing) => ({
             ...item,
             image_urls: Array.isArray(item.image_urls) ? item.image_urls : [],
+            is_suspicious: Boolean(item.is_suspicious),
+            suspicion_meta: item.suspicion_meta && typeof item.suspicion_meta === 'object'
+              ? item.suspicion_meta
+              : null,
+            suspicion_confidence: typeof item.suspicion_confidence === 'number'
+              ? item.suspicion_confidence
+              : null,
+            suspicion_reason: item.suspicion_reason ?? null,
+            last_analyzed_at: item.last_analyzed_at ?? null,
+            posted_at: item.posted_at ?? null,
+            posted_at_text: item.posted_at_text ?? null,
             seller: item.seller
               ? {
                   ...item.seller,
@@ -279,6 +292,9 @@ export default function StoredListingsView() {
                   const priceLabel = formatPrice(priceFormatter, listing)
                   const firstSeen = formatRelative(listing.first_seen_at)
                   const lastSeen = formatRelative(listing.last_seen_at)
+                  const postedAt = formatPostedAt(listing)
+                  const sellerLabel = formatSellerLabel(listing.seller)
+                  const deliveryLabel = formatDelivery(listing.delivery)
                   const primaryImage = listing.thumbnail_url || listing.image_urls[0]
 
                   return (
@@ -334,12 +350,26 @@ export default function StoredListingsView() {
                       </td>
 
                       <td className="px-6 py-4 align-top text-xs text-gray-500">
-                        <div className="space-y-1">
-                          <div>
-                            <span className="font-medium text-gray-700">Erst gesehen:</span> {firstSeen}
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-700">Zuletzt gesehen:</span> {lastSeen}
+                        <div className="space-y-2">
+                          <SuspicionIndicator listing={listing} />
+                          <div className="space-y-1">
+                            {postedAt && (
+                              <div>
+                                <span className="font-medium text-gray-700">Eingestellt:</span> {postedAt}
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-medium text-gray-700">Erst gesehen:</span> {firstSeen}
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Zuletzt gesehen:</span> {lastSeen}
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Verkäufer:</span> {sellerLabel}
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Versand:</span> {deliveryLabel}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -371,6 +401,49 @@ export default function StoredListingsView() {
   )
 }
 
+function SuspicionIndicator({ listing }: { listing: StoredListing }) {
+  const isSuspicious = listing.is_suspicious
+  const meta = (listing.suspicion_meta as { matches?: unknown[] } | null) ?? null
+  const matches = Array.isArray(meta?.matches) ? (meta.matches as unknown[]).length : 0
+  const confidence = typeof listing.suspicion_confidence === 'number'
+    ? Math.round(listing.suspicion_confidence * 100)
+    : null
+  const statusLabel = isSuspicious ? 'Verdächtig' : 'Unauffällig'
+  const Icon = isSuspicious ? ShieldAlert : ShieldCheck
+  const badgeClasses = isSuspicious
+    ? 'bg-red-50 text-red-700 border-red-200'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  const lastAnalyzed = listing.last_analyzed_at ? formatRelative(listing.last_analyzed_at) : null
+  const reason = translateSuspicionReason(listing.suspicion_reason)
+
+  return (
+    <div className="space-y-1 text-xs">
+      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-semibold ${badgeClasses}`}>
+        <Icon className="h-3.5 w-3.5" />
+        {statusLabel}
+        {confidence !== null && (
+          <span className="text-[11px] font-normal">{confidence}%</span>
+        )}
+      </span>
+
+      {isSuspicious && (
+        <div className="text-[11px] text-gray-600">
+          {reason}
+          {matches > 0 && ` • ${matches} ähnliche${matches === 1 ? ' Anzeige' : ' Anzeigen'}`}
+        </div>
+      )}
+
+      {!isSuspicious && reason && reason !== 'Keine Auffälligkeit' && (
+        <div className="text-[11px] text-gray-500">Hinweis: {reason}</div>
+      )}
+
+      {lastAnalyzed && (
+        <div className="text-[11px] text-gray-400">Analyse: {lastAnalyzed}</div>
+      )}
+    </div>
+  )
+}
+
 function formatPrice(formatter: Intl.NumberFormat, listing: StoredListing): string {
   if (listing.price_amount) {
     const numeric = Number(listing.price_amount)
@@ -384,6 +457,73 @@ function formatPrice(formatter: Intl.NumberFormat, listing: StoredListing): stri
     return listing.price_text
   }
   return 'Preis unbekannt'
+}
+
+function translateSuspicionReason(reason?: string | null): string {
+  if (!reason) {
+    return 'Keine Auffälligkeit'
+  }
+
+  switch (reason) {
+    case 'duplicate-image':
+      return 'Bild bereits in anderer Anzeige'
+    default:
+      return reason
+  }
+}
+
+function formatPostedAt(listing: StoredListing): string | null {
+  if (listing.posted_at) {
+    try {
+      const date = new Date(listing.posted_at)
+      return new Intl.DateTimeFormat('de-DE', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }).format(date)
+    } catch {
+      // fall back to raw text
+    }
+  }
+
+  if (typeof listing.posted_at_text === 'string' && listing.posted_at_text.trim()) {
+    return listing.posted_at_text
+  }
+
+  return null
+}
+
+function formatDelivery(delivery?: string | null): string {
+  if (!delivery) {
+    return 'Keine Angabe'
+  }
+
+  switch (delivery) {
+    case 'pickup':
+      return 'Nur Abholung'
+    case 'shipping':
+      return 'Versand möglich'
+    case 'both':
+    case 'shipping_pickup':
+      return 'Abholung & Versand'
+    default:
+      return delivery
+  }
+}
+
+function formatSellerLabel(seller?: SellerInfo | null): string {
+  if (!seller) {
+    return 'Unbekannter Verkäufer'
+  }
+
+  const name = seller.name?.trim()
+  if (name) {
+    if (seller.type === 'business') {
+      return `${name} (Gewerblich)`
+    }
+    return name
+  }
+
+  return seller.type === 'business' ? 'Unbekannter Händler' : 'Unbekannter Verkäufer'
 }
 
 function formatRelative(dateString: string): string {

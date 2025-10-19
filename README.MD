@@ -108,13 +108,95 @@ The stack exposes:
 
 - API: `http://localhost:8000`
 - Frontend: `http://localhost:3001`
-- Postgres data persisted via the `postgres-data` Docker volume
+- **Database data**: Persisted locally in `~/kleinanzeigen-database/` directory (persistent across container restarts)
+
+#### Database Persistence
+
+The PostgreSQL database data is stored in a dedicated directory (`~/kleinanzeigen-database/`) which ensures:
+- ✅ **Data survives container restarts and rebuilds**
+- ✅ **Data persists across system reboots**
+- ✅ **Easy backup** (just copy the `~/kleinanzeigen-database/` directory)
+- ✅ **No data loss** when running `docker compose down`
+
+The `kleinanzeigen-database/` directory is automatically created and stored in the user's home directory.
 
 Environment variables relevant to the compose setup:
 
 - `DATABASE_URL` – connection string used by the backend (defaults to the bundled Postgres service)
 - `SCRAPER_INTERVAL_SECONDS` – default interval for scheduled scrape jobs (seconds)
 - `SCRAPER_JOBS` – JSON array describing automated searches, e.g. `[{"name":"woom-3","query":"Woom 3","page_count":1}]`
+
+### Image Similarity Detection & Monitoring
+
+The backend now analyses all stored listing images automatically and flags entries where photos are re-used across multiple listings.
+
+- A lightweight in-process event bus fans out `ListingImagesUpdated` events once new data is persisted by the scheduler.
+- The dedicated `ImageAnalysisService` downloads the images, computes perceptual hashes via [`imagehash`](https://pypi.org/project/ImageHash/) and stores fingerprints in the new `image_fingerprints` table.
+- Listings with hashes that are within the configurable Hamming distance threshold (default: `<= 5`) receive the label `Verdächtig` together with metadata about the matches.
+- Results are surfaced in the backend API (see `ListingResponse.is_suspicious`) and in the Next.js frontend.
+- Prometheus metrics for background processing are exposed at `GET /metrics` (`image_analysis_events_total`, `image_analysis_duration_seconds`).
+
+#### Database Migration (existing installations)
+
+When upgrading an existing database you need to add the new columns/table manually before starting the API:
+
+```sql
+-- PostgreSQL
+ALTER TABLE listings
+    ADD COLUMN IF NOT EXISTS is_suspicious BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS suspicion_reason VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS suspicion_confidence DOUBLE PRECISION,
+    ADD COLUMN IF NOT EXISTS suspicion_meta JSONB,
+    ADD COLUMN IF NOT EXISTS last_analyzed_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS posted_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS posted_at_text VARCHAR(128);
+
+CREATE TABLE IF NOT EXISTS image_fingerprints (
+    id SERIAL PRIMARY KEY,
+    listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    image_url VARCHAR(2048) NOT NULL,
+    hash_method VARCHAR(32) NOT NULL DEFAULT 'phash',
+    hash_hex VARCHAR(32) NOT NULL,
+    hash_bits BIGINT,
+    width INTEGER,
+    height INTEGER,
+    file_size INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_image_fingerprints_listing_id ON image_fingerprints(listing_id);
+CREATE INDEX IF NOT EXISTS ix_image_fingerprints_hash_hex ON image_fingerprints(hash_hex);
+```
+
+```sql
+-- SQLite (run via sqlite3 CLI)
+ALTER TABLE listings ADD COLUMN is_suspicious INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE listings ADD COLUMN suspicion_reason TEXT;
+ALTER TABLE listings ADD COLUMN suspicion_confidence REAL;
+ALTER TABLE listings ADD COLUMN suspicion_meta JSON;
+ALTER TABLE listings ADD COLUMN last_analyzed_at TEXT;
+ALTER TABLE listings ADD COLUMN posted_at TEXT;
+ALTER TABLE listings ADD COLUMN posted_at_text TEXT;
+
+CREATE TABLE IF NOT EXISTS image_fingerprints (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    listing_id INTEGER NOT NULL,
+    image_url TEXT NOT NULL,
+    hash_method TEXT NOT NULL DEFAULT 'phash',
+    hash_hex TEXT NOT NULL,
+    hash_bits INTEGER,
+    width INTEGER,
+    height INTEGER,
+    file_size INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(listing_id) REFERENCES listings(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS ix_image_fingerprints_listing_id ON image_fingerprints(listing_id);
+CREATE INDEX IF NOT EXISTS ix_image_fingerprints_hash_hex ON image_fingerprints(hash_hex);
+```
+
+After applying the migration restart the API. The scheduler will enqueue analysis jobs automatically for listings whose image set changed.
 
 ### API Endpoints
 

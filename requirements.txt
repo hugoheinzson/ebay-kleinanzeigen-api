@@ -6,20 +6,23 @@ aiohttp==3.12.15
     # via ebay-kleinanzeigen-api (pyproject.toml)
 aiosignal==1.4.0
     # via aiohttp
-asyncpg==0.30.0
-    # via ebay-kleinanzeigen-api (pyproject.toml)
 annotated-types==0.7.0
     # via pydantic
 anyio==4.9.0
     # via
     #   httpx
     #   starlette
+asyncpg==0.30.0
+    # via ebay-kleinanzeigen-api (pyproject.toml)
 attrs==25.3.0
     # via aiohttp
 certifi==2025.7.14
     # via
     #   httpcore
     #   httpx
+    #   requests
+charset-normalizer==3.4.0
+    # via requests
 click==8.2.1
     # via uvicorn
 fastapi==0.116.1
@@ -42,21 +45,46 @@ idna==3.10
     # via
     #   anyio
     #   httpx
+    #   requests
     #   yarl
+imagehash==4.3.1
+    # via ebay-kleinanzeigen-api (pyproject.toml)
 iniconfig==2.1.0
     # via pytest
 loguru==0.7.3
     # via ebay-kleinanzeigen-api (pyproject.toml)
+mcp>=1.18.0
+    # via mcp-server integration
 multidict==6.6.3
     # via
     #   aiohttp
     #   yarl
+numpy==2.1.3
+    # via
+    #   ebay-kleinanzeigen-api (pyproject.toml)
+    #   imagehash
+    #   pandas
 packaging==25.0
-    # via pytest
+    # via
+    #   pandas
+    #   playwright
+    #   pytest
+pandas==2.2.3
+    # via
+    #   ebay-kleinanzeigen-api (pyproject.toml)
+    #   pgeocode
+pgeocode==0.5.0
+    # via ebay-kleinanzeigen-api (pyproject.toml)
+pillow==11.0.0
+    # via
+    #   ebay-kleinanzeigen-api (pyproject.toml)
+    #   imagehash
 playwright==1.54.0
     # via ebay-kleinanzeigen-api (pyproject.toml)
 pluggy==1.6.0
     # via pytest
+prometheus-client==0.21.0
+    # via ebay-kleinanzeigen-api (pyproject.toml)
 propcache==0.3.2
     # via
     #   aiohttp
@@ -71,8 +99,18 @@ pygments==2.19.2
     # via pytest
 pytest==8.4.1
     # via ebay-kleinanzeigen-api (pyproject.toml)
+python-dateutil==2.9.0.post0
+    # via pandas
 python-multipart==0.0.20
     # via ebay-kleinanzeigen-api (pyproject.toml)
+pytz==2025.1
+    # via pandas
+requests==2.32.3
+    # via
+    #   ebay-kleinanzeigen-api (pyproject.toml)
+    #   pgeocode
+six==1.16.0
+    # via python-dateutil
 sniffio==1.3.1
     # via anyio
 starlette==0.47.2
@@ -91,11 +129,15 @@ typing-extensions==4.14.1
     #   typing-inspection
 typing-inspection==0.4.1
     # via pydantic
+tzdata==2024.2
+    # via
+    #   ebay-kleinanzeigen-api (pyproject.toml)
+    #   pandas
+urllib3==2.2.3
+    # via requests
 uvicorn==0.35.0
     # via ebay-kleinanzeigen-api (pyproject.toml)
 uvloop==0.21.0
     # via ebay-kleinanzeigen-api (pyproject.toml)
 yarl==1.20.1
     # via aiohttp
-mcp>=1.18.0
-    # via mcp-server integration

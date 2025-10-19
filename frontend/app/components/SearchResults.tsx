@@ -59,11 +59,18 @@ export default function SearchResults({ results }: SearchResultsProps) {
       {/* Gallery View */}
       {viewMode === 'gallery' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {results.map((result) => (
-          <div
-            key={result.id}
-            className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden border border-gray-200 group"
-          >
+          {results.map((result) => {
+            const distanceLabel = formatDistance(result.distance_km)
+            const locationLabel =
+              result.location && distanceLabel
+                ? `${result.location} • ${distanceLabel}`
+                : result.location || distanceLabel || null
+
+            return (
+              <div
+                key={result.id}
+                className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden border border-gray-200 group"
+              >
             {/* Image */}
             {result.image && (
               <div className="relative h-48 bg-gray-200 overflow-hidden">
@@ -96,10 +103,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
               </div>
 
               {/* Location */}
-              {result.location && (
+              {locationLabel && (
                 <div className="flex items-center text-sm text-gray-600 mb-2">
                   <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                  <span className="truncate">{result.location}</span>
+                  <span className="truncate">{locationLabel}</span>
                 </div>
               )}
 
@@ -135,7 +142,7 @@ export default function SearchResults({ results }: SearchResultsProps) {
               </a>
             </div>
           </div>
-          ))}
+          )})}
         </div>
       )}
 
@@ -164,7 +171,14 @@ export default function SearchResults({ results }: SearchResultsProps) {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {results.map((result) => (
+                {results.map((result) => {
+                  const distanceLabel = formatDistance(result.distance_km)
+                  const locationLabel =
+                    result.location && distanceLabel
+                      ? `${result.location} • ${distanceLabel}`
+                      : result.location || distanceLabel || null
+
+                  return (
                   <tr key={result.id} className="hover:bg-gray-50 transition-colors">
                     {/* Image */}
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -190,10 +204,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
                       <div className="text-sm font-medium text-gray-900 max-w-xs">
                         {result.title}
                       </div>
-                      {result.location && (
+                      {locationLabel && (
                         <div className="flex items-center text-sm text-gray-500 mt-1">
                           <MapPin className="h-3 w-3 mr-1" />
-                          {result.location}
+                          <span className="truncate">{locationLabel}</span>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400 mt-2">
@@ -238,7 +252,7 @@ export default function SearchResults({ results }: SearchResultsProps) {
                       </a>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -246,26 +260,6 @@ export default function SearchResults({ results }: SearchResultsProps) {
       )}
     </div>
   )
-}
-
-function formatDate(dateString: string): string {
-  try {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Gerade eben'
-    if (diffMins < 60) return `Vor ${diffMins} Minute${diffMins !== 1 ? 'n' : ''}`
-    if (diffHours < 24) return `Vor ${diffHours} Stunde${diffHours !== 1 ? 'n' : ''}`
-    if (diffDays < 7) return `Vor ${diffDays} Tag${diffDays !== 1 ? 'en' : ''}`
-    
-    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  } catch {
-    return dateString
-  }
 }
 
 interface DescriptionTooltipProps {
@@ -401,4 +395,121 @@ function ShippingBadge({ shipping }: ShippingBadgeProps) {
       {shipping.label}
     </span>
   )
+}
+
+function formatDistance(distance?: number): string | null {
+  if (typeof distance !== 'number' || !Number.isFinite(distance) || distance < 0) {
+    return null
+  }
+
+  const fractionDigits = distance < 10 ? 1 : 0
+
+  return `${distance.toLocaleString('de-DE', {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: 0,
+  })} km`
+}
+
+function formatDate(dateString: string): string {
+  const normalized = (dateString || '').trim()
+  if (!normalized) {
+    return ''
+  }
+
+  if (isRelativeGermanDescriptor(normalized)) {
+    return normalized
+  }
+
+  const parsed = parseGermanDate(normalized)
+  if (!parsed || Number.isNaN(parsed.getTime())) {
+    return normalized
+  }
+
+  const now = new Date()
+  const diffMs = now.getTime() - parsed.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Gerade eben'
+  if (diffMins < 60) return `Vor ${diffMins} Minute${diffMins !== 1 ? 'n' : ''}`
+  if (diffHours < 24) return `Vor ${diffHours} Stunde${diffHours !== 1 ? 'n' : ''}`
+  if (diffDays < 7) return `Vor ${diffDays} Tag${diffDays !== 1 ? 'en' : ''}`
+
+  return parsed.toLocaleDateString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+function isRelativeGermanDescriptor(value: string): boolean {
+  const lower = value.toLowerCase()
+  return (
+    lower.startsWith('vor ') ||
+    lower.startsWith('gerade eben') ||
+    lower.startsWith('sofort') ||
+    lower.startsWith('weniger als')
+  )
+}
+
+function parseGermanDate(value: string): Date | null {
+  const cleaned = value
+    .replace(/^aktiv seit\s+/i, '')
+    .replace(/\bUhr\.?\b/gi, '')
+    .replace(',', ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!cleaned) {
+    return null
+  }
+
+  const direct = new Date(cleaned)
+  if (!Number.isNaN(direct.getTime())) {
+    return direct
+  }
+
+  const timeMatch = cleaned.match(/(\d{1,2})[:.](\d{2})/)
+  const hours = timeMatch ? Number.parseInt(timeMatch[1], 10) : 0
+  const minutes = timeMatch ? Number.parseInt(timeMatch[2], 10) : 0
+
+  const now = new Date()
+  const lower = cleaned.toLowerCase()
+
+  if (lower.startsWith('heute')) {
+    const result = new Date(now)
+    result.setHours(hours, minutes, 0, 0)
+    return result
+  }
+
+  if (lower.startsWith('gestern')) {
+    const result = new Date(now)
+    result.setDate(result.getDate() - 1)
+    result.setHours(hours, minutes, 0, 0)
+    return result
+  }
+
+  const fullDateMatch = cleaned.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/)
+  if (fullDateMatch) {
+    const day = Number.parseInt(fullDateMatch[1], 10)
+    const month = Number.parseInt(fullDateMatch[2], 10) - 1
+    let year = Number.parseInt(fullDateMatch[3], 10)
+    if (year < 100) {
+      year += 2000
+    }
+    const result = new Date(year, month, day, hours, minutes, 0, 0)
+    return result
+  }
+
+  const partialDateMatch = cleaned.match(/(\d{1,2})\.(\d{1,2})\./)
+  if (partialDateMatch) {
+    const day = Number.parseInt(partialDateMatch[1], 10)
+    const month = Number.parseInt(partialDateMatch[2], 10) - 1
+    const currentYear = now.getFullYear()
+    const result = new Date(currentYear, month, day, hours, minutes, 0, 0)
+    return result
+  }
+
+  return null
 }

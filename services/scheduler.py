@@ -13,7 +13,9 @@ from typing import Any, Dict, List, Optional
 from loguru import logger
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from events import ListingImagesUpdated
 from repositories import ListingRepository, SchedulerJobRepository
+from services.event_bus import EventBus
 from services.kleinanzeigen import fetch_listings, fetch_listing_details
 
 
@@ -125,6 +127,7 @@ class ScraperScheduler:
         browser_manager,
         session_factory: async_sessionmaker,
         jobs: Optional[List[ScraperJobConfig]] = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         self._browser_manager = browser_manager
         self._session_factory = session_factory
@@ -133,6 +136,7 @@ class ScraperScheduler:
         self._tasks: Dict[int, asyncio.Task] = {}
         self._stop_event = asyncio.Event()
         self._lock = asyncio.Lock()
+        self._event_bus = event_bus
 
     async def start(self) -> None:
         """Initialise scheduler jobs and launch active tasks."""
@@ -420,6 +424,7 @@ class ScraperScheduler:
         last_error: Optional[str] = None
         status = "success"
         listings: List[Dict[str, Any]] = []
+        analysis_events: List[ListingImagesUpdated] = []
 
         try:
             result = await fetch_listings(self._browser_manager, **state.params)
@@ -479,7 +484,19 @@ class ScraperScheduler:
                         continue
 
                     try:
-                        await repo.upsert_listing(summary, details, state.name, state.search_metadata)
+                        result = await repo.upsert_listing(summary, details, state.name, state.search_metadata)
+                        await session.flush()
+                        if (
+                            self._event_bus is not None
+                            and result.images_changed
+                        ):
+                            analysis_events.append(
+                                ListingImagesUpdated(
+                                    listing_id=result.listing.id,
+                                    external_id=result.listing.external_id,
+                                    image_urls=result.listing.image_urls or [],
+                                )
+                            )
                         processed_count += 1
                     except Exception:
                         logger.exception("Failed to persist listing", job=state.name, id=external_id)
@@ -498,6 +515,17 @@ class ScraperScheduler:
                 last_result_count=processed_count,
             )
             await session.commit()
+
+        if self._event_bus and analysis_events:
+            for event in analysis_events:
+                try:
+                    await self._event_bus.publish(event)
+                except Exception:
+                    logger.exception(
+                        "Failed to publish image analysis event",
+                        listing_id=event.listing_id,
+                        external_id=event.external_id,
+                    )
 
         async with self._lock:
             existing = self._jobs.get(state.id)

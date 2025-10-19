@@ -31,6 +31,7 @@ from utils.asyncio_optimizations import (
     monitor_slow_coroutines,
 )
 from scrapers.inserate import extract_listing_image_url
+from utils.location_filter import filter_listings_by_radius
 
 
 class UltraOptimizedScraper:
@@ -413,6 +414,41 @@ class UltraOptimizedScraper:
                 duration=request_metrics.total_time,
             )
 
+            # Apply location filtering if requested
+            location_filter_info = None
+            if location and radius:
+                try:
+                    filtered_results, filter_stats = filter_listings_by_radius(
+                        all_results, location, radius
+                    )
+                    all_results = filtered_results
+                    location_filter_info = {
+                        "applied": True,
+                        "location": location,
+                        "radius_km": radius,
+                        "original_count": len(all_results) + filter_stats.excluded_count + filter_stats.missing_count,
+                        "filtered_count": filter_stats.kept_count,
+                        "filtered_percentage": round(
+                            (filter_stats.kept_count / (len(all_results) + filter_stats.excluded_count + filter_stats.missing_count))
+                            * 100
+                            if (len(all_results) + filter_stats.excluded_count + filter_stats.missing_count) > 0
+                            else 0,
+                            1,
+                        ),
+                    }
+                except Exception as e:
+                    logger.log_warning(
+                        f"Location filtering failed: {e}",
+                        ErrorSeverity.LOW,
+                        ctx.context,
+                    )
+                    location_filter_info = {
+                        "applied": False,
+                        "error": str(e),
+                        "location": location,
+                        "radius_km": radius,
+                    }
+
             # Prepare ultra-comprehensive response
             response = {
                 "success": True,
@@ -437,6 +473,10 @@ class UltraOptimizedScraper:
                     "automatic_gc",
                 ],
             }
+
+            # Add location filter information if applied
+            if location_filter_info:
+                response["location_filter"] = location_filter_info
 
             # Add warning information if present
             warnings = warning_manager.get_warnings()
