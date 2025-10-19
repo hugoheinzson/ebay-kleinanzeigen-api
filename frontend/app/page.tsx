@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import SearchForm from './components/SearchForm'
 import SearchResults from './components/SearchResults'
+import StoredListingsView from './components/StoredListingsView'
 import { SearchParams, SearchResult, SellerInfo, ShippingInfo } from './types'
 
 export default function Home() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'search' | 'stored'>('search')
 
   const handleSearch = async (params: SearchParams) => {
     setLoading(true)
@@ -154,46 +156,76 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search Form */}
-        <div className="mb-8">
-          <SearchForm onSearch={handleSearch} loading={loading} />
+        <div className="mb-6 flex flex-wrap items-center gap-4">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'search'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('search')}
+              type="button"
+            >
+              Live Suche
+            </button>
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'stored'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('stored')}
+              type="button"
+            >
+              Gespeicherte Artikel
+            </button>
+          </div>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {error}
+        {activeTab === 'search' ? (
+          <>
+            <div className="mb-8">
+              <SearchForm onSearch={handleSearch} loading={loading} />
             </div>
-          </div>
-        )}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        )}
+            {error && (
+              <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  {error}
+                </div>
+              </div>
+            )}
 
-        {/* Results */}
-        {!loading && results.length > 0 && (
-          <SearchResults results={results} />
-        )}
+            {loading && (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            )}
 
-        {/* Empty State */}
-        {!loading && !error && results.length === 0 && (
-          <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <h3 className="mt-2 text-lg font-medium text-gray-900">Keine Ergebnisse</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Starte eine Suche, um Kleinanzeigen zu finden.
-            </p>
-          </div>
+            {!loading && results.length > 0 && <SearchResults results={results} />}
+
+            {!loading && !error && results.length === 0 && (
+              <div className="text-center py-12">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <h3 className="mt-2 text-lg font-medium text-gray-900">Keine Ergebnisse</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Starte eine Suche, um Kleinanzeigen zu finden.
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <StoredListingsView />
         )}
       </main>
 

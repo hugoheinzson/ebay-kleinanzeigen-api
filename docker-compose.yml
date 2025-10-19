@@ -1,10 +1,26 @@
 # /opt/kleinanzeigen-api/docker-compose.yml
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: kleinanzeigen-db
+    environment:
+      POSTGRES_DB: kleinanzeigen
+      POSTGRES_USER: kleinanzeigen
+      POSTGRES_PASSWORD: kleinanzeigen
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kleinanzeigen -d kleinanzeigen"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     container_name: kleinanzeigen-api
     build:
       context: .
-      dockerfile: Dockerfile       
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -14,7 +30,13 @@ services:
       - API_PORT=8000
       - MCP_HOST=0.0.0.0
       - MCP_PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://kleinanzeigen:kleinanzeigen@db:5432/kleinanzeigen
+      - SCRAPER_INTERVAL_SECONDS=3600
+      - SCRAPER_JOBS=[{"name":"woom-3","query":"Woom 3","page_count":1}]
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     container_name: kleinanzeigen-frontend
@@ -33,3 +55,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  postgres-data:

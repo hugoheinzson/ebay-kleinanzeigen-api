@@ -96,6 +96,26 @@ docker run -p 8000:8000 ebay-kleinanzeigen-api
 
 The API will be available at `http://localhost:8000`
 
+### Deployment with Docker Compose (API + Frontend + Postgres)
+
+For a full stack deployment including the Next.js frontend and the PostgreSQL database, use the provided `docker-compose.yml`:
+
+```sh
+docker compose up -d --build
+```
+
+The stack exposes:
+
+- API: `http://localhost:8000`
+- Frontend: `http://localhost:3001`
+- Postgres data persisted via the `postgres-data` Docker volume
+
+Environment variables relevant to the compose setup:
+
+- `DATABASE_URL` – connection string used by the backend (defaults to the bundled Postgres service)
+- `SCRAPER_INTERVAL_SECONDS` – default interval for scheduled scrape jobs (seconds)
+- `SCRAPER_JOBS` – JSON array describing automated searches, e.g. `[{"name":"woom-3","query":"Woom 3","page_count":1}]`
+
 ### API Endpoints
 
 #### 1. Fetch Listings (Standard)
@@ -151,6 +171,27 @@ Same as `/inserate` endpoint, plus:
 
 ```http
 GET /inserate-detailed?query=laptop&page_count=2&max_concurrent_details=5
+```
+
+#### 4. Persisted Listings
+
+**Endpoint:**
+
+- `GET /stored-listings` – returns paginated results of all stored listings
+- `GET /stored-listings/{external_id}` – returns a single stored listing with full metadata
+
+**Query Parameters for `/stored-listings`:**
+
+- `limit` *(integer, optional, default 25)* – number of entries per page (max. 100)
+- `offset` *(integer, optional, default 0)* – pagination offset
+- `query_name` *(string, optional)* – filter by the configured job name
+- `status` *(string, optional)* – filter by listing status (e.g. `active`, `sold`)
+- `search` *(string, optional)* – full-text search in title and description
+
+**Example Request**
+
+```http
+GET /stored-listings?query_name=woom-3&limit=50
 ```
 
 ### Documentation
