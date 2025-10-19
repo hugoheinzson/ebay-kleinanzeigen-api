@@ -37,3 +37,34 @@ export interface SearchResult {
   seller?: SellerInfo
   shipping?: ShippingInfo
 }
+
+export interface StoredListing {
+  external_id: string
+  query_name?: string | null
+  title?: string | null
+  description?: string | null
+  price_amount?: string | null
+  price_currency?: string | null
+  price_negotiable?: boolean | null
+  price_text?: string | null
+  url?: string | null
+  status?: string | null
+  delivery?: string | null
+  thumbnail_url?: string | null
+  categories?: string[] | null
+  location?: {
+    zip?: string | null
+    city?: string | null
+    state?: string | null
+  } | null
+  seller?: SellerInfo | null
+  details?: Record<string, unknown> | null
+  features?: string[] | null
+  extra_info?: Record<string, unknown> | null
+  image_urls: string[]
+  search_params?: Record<string, unknown> | null
+  first_seen_at: string
+  last_seen_at: string
+  created_at: string
+  updated_at: string
+}
