@@ -43,10 +43,12 @@ export default function StoredListingsView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+  const [totalCount, setTotalCount] = useState<number | null>(null)
 
   const fetchListings = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setTotalCount(null)
 
     try {
       const params = new URLSearchParams()
@@ -81,11 +83,17 @@ export default function StoredListingsView() {
         : []
 
       setListings(normalized)
+      setTotalCount(
+        typeof data.total === 'number'
+          ? data.total
+          : normalized.length
+      )
       setLastUpdated(new Date().toISOString())
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unbekannter Fehler'
       setError(message)
       setListings([])
+      setTotalCount(null)
     } finally {
       setLoading(false)
     }
@@ -121,15 +129,23 @@ export default function StoredListingsView() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setAppliedFilters({ ...filters })}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            disabled={loading}
-          >
-            <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Aktualisieren
-          </button>
+          <div className="flex items-center gap-3">
+            {typeof totalCount === 'number' && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
+                <Database className="h-4 w-4" />
+                {totalCount} Artikel gespeichert
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setAppliedFilters({ ...filters })}
+              className="inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              disabled={loading}
+            >
+              <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Aktualisieren
+            </button>
+          </div>
         </header>
 
         <div className="px-6 py-4">

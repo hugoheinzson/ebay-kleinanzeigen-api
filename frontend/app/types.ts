@@ -68,3 +68,24 @@ export interface StoredListing {
   created_at: string
   updated_at: string
 }
+
+export interface SchedulerJob {
+  id: number
+  name: string
+  query?: string | null
+  location?: string | null
+  radius?: number | null
+  min_price?: number | null
+  max_price?: number | null
+  page_count: number
+  interval_seconds: number
+  is_active: boolean
+  last_run_at?: string | null
+  next_run_at?: string | null
+  last_run_status?: string | null
+  last_run_message?: string | null
+  last_run_duration_seconds?: number | null
+  last_result_count?: number | null
+  created_at: string
+  updated_at: string
+}

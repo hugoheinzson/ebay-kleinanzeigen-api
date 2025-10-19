@@ -32,9 +32,5 @@ async def fetch_listing_details(
     listing_id: str
 ):
     """Fetch listing details using the optimized scraper with shared browser manager."""
-    url = f"https://www.kleinanzeigen.de/s-anzeige/{listing_id}"
-    page = await browser_manager.new_context_page()
-    try:
-        return await get_inserate_details_optimized(url, page)
-    finally:
-        await browser_manager.close_page(page)
+    # FIXED: Use correct parameter order - browser_manager first, then listing_id
+    return await get_inserate_details_optimized(browser_manager, listing_id)

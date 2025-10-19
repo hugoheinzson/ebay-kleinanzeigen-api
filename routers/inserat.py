@@ -15,9 +15,14 @@ async def get_inserat(request: Request, id: str):
     if not id or not id.strip():
         raise HTTPException(status_code=400, detail="Invalid listing ID")
 
-    browser_manager = request.app.state.browser_manager
+    browser_manager = getattr(request.app.state, 'browser_manager', None)
     if not browser_manager:
-        raise HTTPException(status_code=503, detail="Service unavailable")
+        raise HTTPException(status_code=503, detail="Browser manager not available")
+    
+    # Verify that browser_manager is the correct type
+    from utils.browser import OptimizedPlaywrightManager
+    if not isinstance(browser_manager, OptimizedPlaywrightManager):
+        raise HTTPException(status_code=503, detail=f"Invalid browser manager type: {type(browser_manager)}")
 
     try:
         response = await get_inserate_details_optimized(browser_manager, id)

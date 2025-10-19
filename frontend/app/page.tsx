@@ -4,13 +4,14 @@ import { useState } from 'react'
 import SearchForm from './components/SearchForm'
 import SearchResults from './components/SearchResults'
 import StoredListingsView from './components/StoredListingsView'
+import SchedulerJobsView from './components/SchedulerJobsView'
 import { SearchParams, SearchResult, SellerInfo, ShippingInfo } from './types'
 
 export default function Home() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'search' | 'stored'>('search')
+  const [activeTab, setActiveTab] = useState<'search' | 'stored' | 'scheduler'>('search')
 
   const handleSearch = async (params: SearchParams) => {
     setLoading(true)
@@ -180,6 +181,17 @@ export default function Home() {
             >
               Gespeicherte Artikel
             </button>
+            <button
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'scheduler'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+              onClick={() => setActiveTab('scheduler')}
+              type="button"
+            >
+              Scheduler
+            </button>
           </div>
         </div>
 
@@ -224,8 +236,10 @@ export default function Home() {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'stored' ? (
           <StoredListingsView />
+        ) : (
+          <SchedulerJobsView />
         )}
       </main>
 
